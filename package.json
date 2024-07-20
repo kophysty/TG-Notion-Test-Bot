@@ -1,0 +1,17 @@
+{
+    "name": "tg-notion-test-bot",
+    "version": "1.0.0",
+    "description": "Telegram bot for Notion integration - Test version",
+    "main": "telegram.js",
+    "scripts": {
+        "start": "node src/telegram.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "axios": "^0.21.1",
+        "dotenv": "^10.0.0",
+        "express": "^4.19.2",
+        "moment": "^2.29.1",
+        "node-telegram-bot-api": "^0.53.0"
+    }
+}

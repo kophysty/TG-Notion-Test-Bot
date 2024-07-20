@@ -4,8 +4,8 @@ require('dotenv').config();
 
 
 // Constants and variables initialization
-const notionToken = process.env.NOTION_TOKEN_LOCAL;
-const databaseId = process.env.NOTION_DATABASE_ID_LOCAL;
+const notionToken = process.env.NOTION_TOKEN;
+const databaseId = process.env.NOTION_DATABASE_ID;
 
 // Notion API client initialization
 const notion = axios.create({
@@ -45,6 +45,9 @@ const getTasksFromNotion = async () => {
     throw error;
   }
 };
+
+console.log('Notion Token:', notionToken ? 'Defined' : 'Undefined');
+console.log('Database ID:', databaseId ? 'Defined' : 'Undefined');
 
 // Function to add task to Notion
 const addTaskToNotion = async (task, category, pmd, priority, dueDate) => {

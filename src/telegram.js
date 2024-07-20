@@ -1,5 +1,7 @@
+require('dotenv').config();
+
 // Imports and environment setup
-const { addTaskToNotion, getTasksFromNotion, getDatabaseStructure } = require('./notion_local');
+const { addTaskToNotion, getTasksFromNotion, getDatabaseStructure } = require('./notion');
 const TASK_CATEGORIES = ['Today', 'Work', 'Home', 'Global', 'Everyday', "Personal"];
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
@@ -26,8 +28,8 @@ const waitingForDate = new Set();
 const NOTION_PAGE_URL = 'https://www.notion.so/web3-future/43610d53378b41af9cf8b9e3df8878a7?v=d72e546e934f4205a93735881191a067&pvs=4';
 
 // Bot initialization
-const token = process.env.TELEGRAM_BOT_TOKEN_LOCAL;
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN_LOCAL, { 
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
   polling: true,
   request: {
     timeout: 60000 // increase timeout to 60 seconds
@@ -368,7 +370,9 @@ async function sendTodayTasks(chatId) {
 // Function to sort tasks by groups
 async function sendGroupedTaskList(chatId) {
   try {
+    console.log('Fetching tasks from Notion...');
     const tasks = await getTasksFromNotion();
+    console.log(`Fetched ${tasks.length} tasks from Notion`);
     // Filter out tasks with 'done' or 'complete' status
     const activeTasks = tasks.filter(task => 
       task.status.toLowerCase() !== 'done' && 
@@ -422,6 +426,7 @@ async function sendGroupedTaskList(chatId) {
     }
   } catch (error) {
     console.error('Error fetching tasks from Notion:', error);
+    console.error('Error in sendGroupedTaskList:', error);
     bot.sendMessage(chatId, 'Failed to fetch tasks. Please try again later or contact the administrator.');
   }
   
