@@ -103,7 +103,12 @@ bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const action = query.data;
 
-  if (action === 'ignore') {
+  if (action.startsWith('cancel:')) {
+    if (taskTimers[chatId]) {
+      clearTimeout(taskTimers[chatId]);
+      delete taskTimers[chatId];
+    }
+    bot.sendMessage(chatId, 'Task addition cancelled.');
     bot.answerCallbackQuery(query.id);
     return;
   }
@@ -287,20 +292,32 @@ bot.on('message', async (msg) => {
 
   if (msg.text && !msg.text.startsWith('/') && msg.text.trim() !== '') {
     const task = msg.text;
-    const truncatedTask = truncateString(task, 20); // Limit task name length for callback_data
+    const taskId = generateTaskId(task);
+    const truncatedTask = truncateString(task, 20);
+
+    // Create a 2D array for the inline keyboard
+    const categoryKeyboard = [
+      [{ text: 'Cancel', callback_data: `cancel:${taskId}` }],
+      [],
+      []
+    ];
+
+    // Distribute category buttons across two rows
+    TASK_CATEGORIES.forEach((category, index) => {
+      const row = Math.floor(index / 3) + 1; // +1 because the first row is for Cancel
+      categoryKeyboard[row].push({
+        text: category,
+        callback_data: `sc:${taskId}:${category}`.substr(0, 64)
+      });
+    });
 
     const opts = {
       reply_markup: {
-        inline_keyboard: TASK_CATEGORIES.map(category => ([
-          { 
-            text: category, 
-            callback_data: `sc:${truncatedTask}:${category}`.substr(0, 64) // Limit callback_data length
-          }
-        ]))
+        inline_keyboard: categoryKeyboard
       }
     };
 
-    bot.sendMessage(chatId, `Choose a category for the task "${task}":`, opts);
+    bot.sendMessage(chatId, `Choose a category for the task "${truncatedTask}":`, opts);
 
     // Set a 30-second timer
     taskTimers[chatId] = setTimeout(async () => {
