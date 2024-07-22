@@ -1,6 +1,13 @@
 require('dotenv').config();
 
+const crypto = require('crypto');
+
+function generateTaskId(task) {
+  return crypto.createHash('md5').update(task).digest('hex').substr(0, 8);
+}
+
 // Imports and environment setup
+const taskStorage = {};
 const { addTaskToNotion, getTasksFromNotion, getDatabaseStructure } = require('./notion');
 const TASK_CATEGORIES = ['Today', 'Work', 'Home', 'Global', 'Everyday', "Personal"];
 const express = require('express');
@@ -9,8 +16,10 @@ const rp = require('request-promise');
 require('dotenv').config();
 const moment = require('moment');
 
-
-
+function truncateString(str, maxLength) {
+  if (str.length <= maxLength) return str;
+  return str.substr(0, maxLength - 3) + '...';
+}
 
 // Options and categories
 const PRIORITY_OPTIONS = ['skip', 'Low', 'Med', 'High'];
@@ -99,8 +108,12 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  if (action.startsWith('select_category:')) {
-    const [, task, category] = action.split(':');
+  const fullTask = query.message.text.split('"')[1]; // Get full task text from the message
+  const taskId = generateTaskId(fullTask);
+  const truncatedTask = truncateString(fullTask, 20); // For display purposes
+
+  if (action.startsWith('sc:')) {
+    const [, , category] = action.split(':');
     console.log(`Selected category: ${category}`);
     
     if (taskTimers[chatId]) {
@@ -114,20 +127,23 @@ bot.on('callback_query', async (query) => {
       const pmdKeyboard = {
         reply_markup: {
           inline_keyboard: [
-            PMD_OPTIONS.map(option => ({ text: option, callback_data: `pmd:${task}:${category}:${option}` }))
+            PMD_OPTIONS.map(option => ({ 
+              text: option, 
+              callback_data: `pmd:${taskId}:${category}:${option}`.substr(0, 64)
+            }))
           ]
         }
       };
       
-      bot.sendMessage(chatId, 'Please select the PMD value for this task:', pmdKeyboard);
+      bot.sendMessage(chatId, `Please select the PMD value for task "${truncatedTask}":`, pmdKeyboard);
 
       taskTimers[chatId] = setTimeout(async () => {
         if (waitingForPMD.has(chatId)) {
           waitingForPMD.delete(chatId);
           try {
-            await addTaskToNotion(task, category, null, null, null);
-            bot.sendMessage(chatId, `PMD selection time expired. Task "${task}" has been added to the "${category}" category with no PMD, priority, or due date.`);
-            console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: null, Priority: null, Due Date: null)`);
+            await addTaskToNotion(fullTask, category, null, null, null);
+            bot.sendMessage(chatId, `PMD selection time expired. Task "${truncatedTask}" has been added to the "${category}" category with no PMD, priority, or due date.`);
+            console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: null, Priority: null, Due Date: null)`);
           } catch (error) {
             bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
             console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -136,16 +152,16 @@ bot.on('callback_query', async (query) => {
       }, 30000);
     } else if (DATE_CATEGORIES.includes(category)) {
       waitingForDate.add(chatId);
-      const dateKeyboard = createDateKeyboard(task, category);
-      bot.sendMessage(chatId, 'Please select a due date for this task:', dateKeyboard);
+      const dateKeyboard = createDateKeyboard(taskId, category);
+      bot.sendMessage(chatId, `Please select a due date for task "${truncatedTask}":`, dateKeyboard);
       
       taskTimers[chatId] = setTimeout(async () => {
         if (waitingForDate.has(chatId)) {
           waitingForDate.delete(chatId);
           try {
-            await addTaskToNotion(task, category, null, null, null);
-            bot.sendMessage(chatId, `Date selection time expired. Task "${task}" has been added to the "${category}" category without a due date.`);
-            console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, no due date)`);
+            await addTaskToNotion(fullTask, category, null, null, null);
+            bot.sendMessage(chatId, `Date selection time expired. Task "${truncatedTask}" has been added to the "${category}" category without a due date.`);
+            console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, no due date)`);
           } catch (error) {
             bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
             console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -154,16 +170,16 @@ bot.on('callback_query', async (query) => {
       }, 60000);
     } else {
       try {
-        await addTaskToNotion(task, category, null, null, null);
-        bot.sendMessage(chatId, `Task "${task}" has been added to the "${category}" category.`);
-        console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: null, Priority: null, Due Date: null)`);
+        await addTaskToNotion(fullTask, category, null, null, null);
+        bot.sendMessage(chatId, `Task "${truncatedTask}" has been added to the "${category}" category.`);
+        console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: null, Priority: null, Due Date: null)`);
       } catch (error) {
         bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
         console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
       }
     }
   } else if (action.startsWith('pmd:')) {
-    const [, task, category, pmdValue] = action.split(':');
+    const [, , category, pmdValue] = action.split(':');
     waitingForPMD.delete(chatId);
     waitingForPriority.add(chatId);
     
@@ -177,20 +193,23 @@ bot.on('callback_query', async (query) => {
     const priorityKeyboard = {
       reply_markup: {
         inline_keyboard: [
-          PRIORITY_OPTIONS.map(option => ({ text: option, callback_data: `priority:${task}:${category}:${pmd}:${option}` }))
+          PRIORITY_OPTIONS.map(option => ({ 
+            text: option, 
+            callback_data: `priority:${taskId}:${category}:${pmd}:${option}`.substr(0, 64)
+          }))
         ]
       }
     };
     
-    bot.sendMessage(chatId, 'Please select the priority for this task:', priorityKeyboard);
+    bot.sendMessage(chatId, `Please select the priority for task "${truncatedTask}":`, priorityKeyboard);
 
     taskTimers[chatId] = setTimeout(async () => {
       if (waitingForPriority.has(chatId)) {
         waitingForPriority.delete(chatId);
         try {
-          await addTaskToNotion(task, category, pmd, null, null);
-          bot.sendMessage(chatId, `Priority selection time expired. Task "${task}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd}, default priority, and no due date.`);
-          console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: ${pmd}, Priority: null, Due Date: null)`);
+          await addTaskToNotion(fullTask, category, pmd, null, null);
+          bot.sendMessage(chatId, `Priority selection time expired. Task "${truncatedTask}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd}, default priority, and no due date.`);
+          console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: ${pmd}, Priority: null, Due Date: null)`);
         } catch (error) {
           bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
           console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -198,7 +217,7 @@ bot.on('callback_query', async (query) => {
       }
     }, 30000);
   } else if (action.startsWith('priority:')) {
-    const [, task, category, pmd, priority] = action.split(':');
+    const [, , category, pmd, priority] = action.split(':');
     waitingForPriority.delete(chatId);
     
     if (taskTimers[chatId]) {
@@ -210,16 +229,16 @@ bot.on('callback_query', async (query) => {
     
     if (DATE_CATEGORIES.includes(category)) {
       waitingForDate.add(chatId);
-      const dateKeyboard = createDateKeyboard(task, category, pmd, finalPriority);
-      bot.sendMessage(chatId, 'Please select a due date for this task:', dateKeyboard);
+      const dateKeyboard = createDateKeyboard(taskId, category, pmd, finalPriority);
+      bot.sendMessage(chatId, `Please select a due date for task "${truncatedTask}":`, dateKeyboard);
       
       taskTimers[chatId] = setTimeout(async () => {
         if (waitingForDate.has(chatId)) {
           waitingForDate.delete(chatId);
           try {
-            await addTaskToNotion(task, category, pmd, finalPriority, null);
-            bot.sendMessage(chatId, `Date selection time expired. Task "${task}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd}, Priority: ${finalPriority || 'not set'}, and no due date.`);
-            console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: ${pmd}, Priority: ${finalPriority}, Due Date: null)`);
+            await addTaskToNotion(fullTask, category, pmd, finalPriority, null);
+            bot.sendMessage(chatId, `Date selection time expired. Task "${truncatedTask}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd}, Priority: ${finalPriority || 'not set'}, and no due date.`);
+            console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: ${pmd}, Priority: ${finalPriority}, Due Date: null)`);
           } catch (error) {
             bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
             console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -228,17 +247,16 @@ bot.on('callback_query', async (query) => {
       }, 30000);
     } else {
       try {
-        console.log(`Adding task to Notion: ${task}, category: ${category}`);
-        await addTaskToNotion(task, category, pmd, finalPriority, null);
-        bot.sendMessage(chatId, `Task "${task}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd} and Priority: ${finalPriority || 'not set'}.`);
-        console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: ${pmd}, Priority: ${finalPriority}, Due Date: null)`);
+        await addTaskToNotion(fullTask, category, pmd, finalPriority, null);
+        bot.sendMessage(chatId, `Task "${truncatedTask}" has been added to the "${category}" category with PMD: ${pmd === null ? 'not set' : pmd} and Priority: ${finalPriority || 'not set'}.`);
+        console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: ${pmd}, Priority: ${finalPriority}, Due Date: null)`);
       } catch (error) {
         bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
         console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
       }
     }
   } else if (action.startsWith('date:')) {
-    const [, task, category, pmd, priority, dateString] = action.split(':');
+    const [, , category, pmd, priority, dateString] = action.split(':');
     waitingForDate.delete(chatId);
     
     if (taskTimers[chatId]) {
@@ -249,9 +267,9 @@ bot.on('callback_query', async (query) => {
     let finalDate = dateString.toLowerCase() === 'skip' ? null : dateString;
     
     try {
-      await addTaskToNotion(task, category, pmd === 'null' ? null : parseFloat(pmd), priority === 'null' ? null : priority, finalDate);
-      bot.sendMessage(chatId, `Task "${task}" has been added to the "${category}" category with PMD: ${pmd === 'null' ? 'not set' : pmd}, Priority: ${priority === 'null' ? 'not set' : priority}, and Due Date: ${finalDate || 'not set'}.`);
-      console.log(`Task added to Notion for chat ${chatId}: ${task} (category: ${category}, PMD: ${pmd}, Priority: ${priority}, Due Date: ${finalDate})`);
+      await addTaskToNotion(fullTask, category, pmd === 'null' ? null : parseFloat(pmd), priority === 'null' ? null : priority, finalDate);
+      bot.sendMessage(chatId, `Task "${truncatedTask}" has been added to the "${category}" category with PMD: ${pmd === 'null' ? 'not set' : pmd}, Priority: ${priority === 'null' ? 'not set' : priority}, and Due Date: ${finalDate || 'not set'}.`);
+      console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: ${category}, PMD: ${pmd}, Priority: ${priority}, Due Date: ${finalDate})`);
     } catch (error) {
       bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
       console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -269,11 +287,15 @@ bot.on('message', async (msg) => {
 
   if (msg.text && !msg.text.startsWith('/') && msg.text.trim() !== '') {
     const task = msg.text;
+    const truncatedTask = truncateString(task, 20); // Limit task name length for callback_data
 
     const opts = {
       reply_markup: {
         inline_keyboard: TASK_CATEGORIES.map(category => ([
-          { text: category, callback_data: `select_category:${task}:${category}` }
+          { 
+            text: category, 
+            callback_data: `sc:${truncatedTask}:${category}`.substr(0, 64) // Limit callback_data length
+          }
         ]))
       }
     };
@@ -283,9 +305,9 @@ bot.on('message', async (msg) => {
     // Set a 30-second timer
     taskTimers[chatId] = setTimeout(async () => {
       try {
-        await addTaskToNotion(task, 'Today', null, null);
-        bot.sendMessage(chatId, `Category selection time expired. Task "${task}" has been added with the "Today" category, no PMD, and default priority.`);
-        console.log(`Task added to Notion for chat ${chatId}: ${task} (category: Today, PMD: null, Priority: null)`);
+        await addTaskToNotion(task, 'Today', null, null, null);
+        bot.sendMessage(chatId, `Category selection time expired. Task "${truncatedTask}" has been added with the "Today" category, no PMD, no priority, and no due date.`);
+        console.log(`Task added to Notion for chat ${chatId}: ${truncatedTask} (category: Today, PMD: null, Priority: null, Due Date: null)`);
       } catch (error) {
         bot.sendMessage(chatId, `Failed to add task to Notion. Please try again later or contact the administrator.`);
         console.error(`Failed to add task to Notion for chat ${chatId}: ${error.message}`);
@@ -296,11 +318,11 @@ bot.on('message', async (msg) => {
 });
 
 //Function for date keyboard
-function createDateKeyboard(task, category, pmd = null, priority = null) {
+function createDateKeyboard(taskId, category, pmd = null, priority = null) {
   const startDate = moment().add(1, 'days').startOf('day');
   const endDate = moment(startDate).add(29, 'days');
   const keyboard = [
-    [{ text: 'skip', callback_data: `date:${task}:${category}:${pmd}:${priority}:skip` }],
+    [{ text: 'skip', callback_data: `date:${taskId}:${category}:${pmd}:${priority}:skip`.substr(0, 64) }],
     ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({ text: day, callback_data: 'ignore' }))
   ];
 
@@ -309,7 +331,6 @@ function createDateKeyboard(task, category, pmd = null, priority = null) {
   while (startDate.isSameOrBefore(endDate)) {
     const dayOfWeek = startDate.day();
     
-    // Add empty buttons for days before the start date in the first week
     if (currentWeek.length === 0 && dayOfWeek !== 1) {
       for (let i = 1; i < dayOfWeek; i++) {
         currentWeek.push({ text: ' ', callback_data: 'ignore' });
@@ -321,11 +342,10 @@ function createDateKeyboard(task, category, pmd = null, priority = null) {
     
     currentWeek.push({
       text: buttonText,
-      callback_data: `date:${task}:${category}:${pmd}:${priority}:${startDate.format('YYYY-MM-DD')}`
+      callback_data: `date:${taskId}:${category}:${pmd}:${priority}:${startDate.format('YYYY-MM-DD')}`.substr(0, 64)
     });
 
     if (dayOfWeek === 0 || startDate.isSame(endDate)) {
-      // Fill the rest of the week with empty buttons if it's the last day
       while (currentWeek.length < 7) {
         currentWeek.push({ text: ' ', callback_data: 'ignore' });
       }
