@@ -339,8 +339,7 @@ function createDateKeyboard(taskId, category, pmd = null, priority = null) {
   const startDate = moment().add(1, 'days').startOf('day');
   const endDate = moment(startDate).add(29, 'days');
   const keyboard = [
-    [{ text: 'skip', callback_data: `date:${taskId}:${category}:${pmd}:${priority}:skip`.substr(0, 64) }],
-    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({ text: day, callback_data: 'ignore' }))
+    [{ text: 'skip', callback_data: `date:${taskId}:${category}:${pmd}:${priority}:skip`.substr(0, 64) }]
   ];
 
   let currentWeek = [];
