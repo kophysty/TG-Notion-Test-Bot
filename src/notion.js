@@ -21,6 +21,7 @@ const notion = axios.create({
 const getTasksFromNotion = async () => {
   console.log('Getting tasks from local Notion database');
   try {
+    console.log(`Attempting to query database: ${databaseId}`);
     const response = await notion.post(`databases/${databaseId}/query`);
     return response.data.results.map(task => {
       const statusProperty = task.properties.Status;
@@ -41,7 +42,8 @@ const getTasksFromNotion = async () => {
       };
     });
   } catch (error) {
-    console.error('Error getting tasks from local Notion database:', error.response ? error.response.data : error.message);
+    console.error('Error getting tasks from Notion:', error.response ? error.response.data : error.message);
+    console.error('Full error object:', JSON.stringify(error, null, 2));
     throw error;
   }
 };
@@ -51,8 +53,7 @@ console.log('Database ID:', databaseId ? 'Defined' : 'Undefined');
 
 // Function to add task to Notion
 const addTaskToNotion = async (task, category, pmd, priority, dueDate) => {
-  console.log('Adding task to Notion:', task, 'Category:', category, 'PMD:', pmd, 'Priority:', priority, 'Due Date:', dueDate);
-  try {
+  console.log(`Adding task to Notion: "${task}" (Category: ${category}, PMD: ${pmd}, Priority: ${priority}, Due Date: ${dueDate})`);  try {
     const requestBody = {
       parent: { database_id: databaseId },
       properties: {
