@@ -7,8 +7,7 @@ This project is a Telegram bot that adds tasks to a Notion database.
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/your-repository/todo-list-bot.git
-cd todo-list-bot
+git clone https://github.com/kophysty/TG-Notion-Test-Bot
 ```
 
 ### Step 2: Install Dependencies
@@ -34,8 +33,6 @@ node src/telegram.js
 
 ### Usage
 
-
-
 Open a chat with your Telegram bot and send the command /add <your task> to add a task to Notion.
 
 ### Example Commands
@@ -59,4 +56,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ### Contact
 If you have any questions or need further assistance, please open an issue in this repository or contact the repository owner.
 
-...
