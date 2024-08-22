@@ -4,8 +4,8 @@ require('dotenv').config();
 
 
 // Constants and variables initialization
-const notionToken = process.env.NOTION_TOKEN;
-const databaseId = process.env.NOTION_DATABASE_ID;
+const notionToken = process.env.NOTION_TOKEN_LOCAL;
+const databaseId = process.env.NOTION_DATABASE_ID_LOCAL;
 
 // Notion API client initialization
 const notion = axios.create({

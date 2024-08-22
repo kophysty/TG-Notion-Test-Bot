@@ -37,9 +37,10 @@ const waitingForDate = new Set();
 const NOTION_PAGE_URL = 'https://www.notion.so/web3-future/43610d53378b41af9cf8b9e3df8878a7?v=d72e546e934f4205a93735881191a067&pvs=4';
 
 // Bot initialization
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
+const token = process.env.TELEGRAM_BOT_TOKEN_LOCAL;
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN_LOCAL, { 
   polling: true,
+  cancellation: true,
   request: {
     timeout: 60000 // increase timeout to 60 seconds
   }
